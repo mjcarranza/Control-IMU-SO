@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "usb.h": "c",
+        "mod_devicetable.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}
