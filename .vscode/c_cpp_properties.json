@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerArgs": [
+                "-Wall",
+                "-g",
+                "-std=c++17", // Adjust C++ standard if needed
+                "-I", "/usr/include/c++"  // Replace with actual include path
+            ]
+        }
+    ],
+    "version": 4
+}
