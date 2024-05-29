@@ -8,9 +8,10 @@
 int main() {
     int fd;
     struct termios options;
-    char *portname = "/dev/ttyACM0"; // Cambia esto según el puerto de tu Arduino
-    char command[10];
-    char input[5];
+    char *portname = "/dev/ttyACM0"; // Set Arduino port
+    char command[20];
+    char inputIzq[5];
+    char inputDer[5];
 
     // Abre el puerto serie
     fd = open(portname, O_RDWR | O_NOCTTY | O_NDELAY);
@@ -30,25 +31,29 @@ int main() {
     fcntl(fd, F_SETFL, 0);
 
     while (1) {
-        // Leer la entrada del usuario
-        fgets(input, sizeof(input), stdin);
-        
-        // Eliminar el carácter de nueva línea al final de la cadena
-        input[strcspn(input, "\n")] = 0;
+        // Leer la entrada del usuario para el servo Izq
+        printf("Introduce la posición para el servo Izq:\n");
+        fgets(inputIzq, sizeof(inputIzq), stdin);
+        inputIzq[strcspn(inputIzq, "\n")] = 0; // Eliminar el carácter de nueva línea
 
         // Comparar la entrada con "exit"
-        if (strcmp(input, "exit") == 0) {
+        if (strcmp(inputIzq, "exit") == 0) {
             break;
         }
-        else {
-            // Enviar comando al Arduino
-            snprintf(command, sizeof(command), "%d", atoi(input)); // Enviar posición 90 grados
-            strcat(command, "\n"); // Agregar un carácter de nueva línea al final
-            write(fd, command, strlen(command)); // Enviar solo la longitud del comando
+
+        // Leer la entrada del usuario para el servo Der
+        printf("Introduce la posición para el servo Der:\n");
+        fgets(inputDer, sizeof(inputDer), stdin);
+        inputDer[strcspn(inputDer, "\n")] = 0; // Eliminar el carácter de nueva línea
+
+        // Comparar la entrada con "exit"
+        if (strcmp(inputDer, "exit") == 0) {
+            break;
         }
 
-        // Imprimir la entrada del usuario
-        printf("Has escrito: %s\n", input);
+        // Enviar comando al Arduino para ambos servos
+        snprintf(command, sizeof(command), "%s,%s\n", inputIzq, inputDer);
+        write(fd, command, strlen(command));
     }
 
     close(fd);
