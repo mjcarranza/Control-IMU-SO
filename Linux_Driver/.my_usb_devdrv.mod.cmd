@@ -1,1 +1,0 @@
-savedcmd_/home/daniel/Desktop/Linux_Driver/my_usb_devdrv.mod := printf '%s\n'   my_usb_devdrv.o | awk '!x[$$0]++ { print("/home/daniel/Desktop/Linux_Driver/"$$0) }' > /home/daniel/Desktop/Linux_Driver/my_usb_devdrv.mod
