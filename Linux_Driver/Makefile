@@ -6,12 +6,13 @@ all:
 
 # Unload and load the driver  # Use with sudo
 install:
-	rmmod ArduinoDriver || true
-	insmod ArduinoDriver.ko || true
+	sudo rmmod cdc_acm || true
+	sudo rmmod ArduinoDriver || true
+	sudo insmod ArduinoDriver.ko || true
 
 # Unload the driver 
-remove:
-	rmmod ArduinoDriver || true
+rem:
+	sudo rmmod ArduinoDriver || true
 
 # Clean all the generated files
 clean:

@@ -199,7 +199,7 @@ static struct file_operations fops = {
 // it is going to be created a file called RoboticFinger and a number, and this file is going to be used 
 // for the communication to the usb driver
 static struct usb_class_driver skel_class = {
-    .name = "usb/RoboticFinger%d",
+    .name = "ArduinoDriver%d",
     .fops = &fops,
     .minor_base = USB_SKEL_MINOR_BASE,
 };
