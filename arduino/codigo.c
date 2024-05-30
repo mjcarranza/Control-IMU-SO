@@ -8,15 +8,15 @@
 int main() {
     int fd;
     struct termios options;
-    char *portname = "/dev/ttyACM0"; // Set Arduino port
+    char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
     char command[20];
     char inputIzq[5];
     char inputDer[5];
 
     // Abre el puerto serie
-    fd = open(portname, O_RDWR | O_NOCTTY | O_NDELAY);
+    fd = open(portname, O_RDWR);
     if (fd == -1) {
-        perror("open_port: Unable to open /dev/ttyACM0 - ");
+        perror("open_port: Unable to open /dev/ArduinoDriver3 - ");
         return -1;
     }
 
