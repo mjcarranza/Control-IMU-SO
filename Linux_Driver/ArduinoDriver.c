@@ -7,7 +7,6 @@
 #include <linux/usb.h>
 #include <asm/uaccess.h>
 
-
 // define the arduino vendor and product ID
 #define ARDUINO_VENDOR_ID    0x2341
 #define ARDUINO_PRODUCT_ID   0x0043
@@ -216,8 +215,6 @@ static int usb_probe(struct usb_interface *interface, const struct usb_device_id
     int i;
     int retval = -ENOMEM;
 
-	
-
     // allocate memory for our device state and initialize it
     dev = kzalloc(sizeof(struct usb_skel), GFP_KERNEL);
     if (!dev) {
@@ -299,8 +296,7 @@ static void usb_disconnect(struct usb_interface *interface)
 
     dev_info(&interface->dev, "USB Skeleton #%d now disconnected", minor);
 
-	printk(KERN_INFO KBUILD_MODNAME " Me desconecté del Driver \n");
-
+    printk(KERN_INFO KBUILD_MODNAME " Me desconecté del Driver \n");
 }
 
 // This structure must be filled out by the USB driver and consists of a number of function
@@ -315,7 +311,7 @@ static struct usb_driver driver = {
 // This function is in charge of registering the usb_driver
 static int __init usb_init(void)
 {
-	printk(KERN_INFO KBUILD_MODNAME " Me pusieron el Driver \n");
+    printk(KERN_INFO KBUILD_MODNAME " Me pusieron el Driver \n");
     int result;
 
     // register this driver with the USB subsystem 
@@ -329,7 +325,7 @@ static int __init usb_init(void)
 // This function is in charge of unregistering the usb_driver
 static void __exit usb_exit(void)
 {
-	printk(KERN_INFO KBUILD_MODNAME " Me quitaron el Driver \n");
+    printk(KERN_INFO KBUILD_MODNAME " Me quitaron el Driver \n");
     usb_deregister(&driver);
 }
 

@@ -1,0 +1,46 @@
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/module.h>
+#include <linux/spinlock.h> 
+#include <linux/kref.h>
+#include <linux/usb.h>
+#include <linux/usb/serial.h>
+#include <asm/uaccess.h>
+
+
+// define the arduino vendor and product ID
+#define ARDUINO_VENDOR_ID    0x2341
+#define ARDUINO_PRODUCT_ID   0x0043
+
+#define DEFAULT_BAUD_RATE 9600
+#define TTYDEV_LCR_ENABLE_RX 0x01
+#define TTYDEV_LCR_ENABLE_TX 0x02
+#define TTYDEV_LCR_CS8 0x03
+
+static int usb_probe(struct usb_serial_port *port) 
+{ 
+ struct TTYDEV_private *priv; 
+ int r; 
+ 
+ priv = kzalloc(sizeof(struct TTYDEV_private), GFP_KERNEL); 
+ if (!priv) 
+  return -ENOMEM; 
+ 
+ spin_lock_init(&priv->lock); 
+ priv->baud_rate = DEFAULT_BAUD_RATE; 
+ priv->lcr = TTYDEV_LCR_ENABLE_RX | TTYDEV_LCR_ENABLE_TX | TTYDEV_LCR_CS8; 
+ 
+ r = TTYDEV_configure(port->serial->dev, priv); 
+ if (r < 0) 
+  goto error; 
+ 
+ printk("New device connected to my tty driver."); 
+ 
+ usb_set_serial_port_data(port, priv); 
+ return 0; 
+ 
+error: kfree(priv); 
+ return r; 
+}

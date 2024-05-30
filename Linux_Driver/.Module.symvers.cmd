@@ -1,0 +1,1 @@
+savedcmd_/home/mario/Documents/GitHub/Control-IMU-SO/Linux_Driver/Module.symvers :=  scripts/mod/modpost -m -a      -o /home/mario/Documents/GitHub/Control-IMU-SO/Linux_Driver/Module.symvers -T /home/mario/Documents/GitHub/Control-IMU-SO/Linux_Driver/modules.order -i Module.symvers -e 
