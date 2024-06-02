@@ -7,39 +7,45 @@
 #include <linux/usb.h>
 #include <asm/uaccess.h>
 
-// define the arduino vendor and product ID
+// Define el ID del fabricante y del producto de Arduino
 #define ARDUINO_VENDOR_ID    0x2341
 #define ARDUINO_PRODUCT_ID   0x0043
 
-// table with the devices that can work with this driver
+// Tabla con los dispositivos que pueden trabajar con este driver
 static struct usb_device_id tableOfDevices [] = {
     {USB_DEVICE(ARDUINO_VENDOR_ID, ARDUINO_PRODUCT_ID)},
     {}
 };
 
-// define the device table
+// Definir la tabla de dispositivos
 MODULE_DEVICE_TABLE(usb, tableOfDevices);
 
-// Get a minor range for your devices from the usb maintainer 
+// Obtener un rango menor para los dispositivos del mantenedor USB
 #define USB_SKEL_MINOR_BASE  192
 
-// Structure to hold all of our device specific stuff 
+// Estructura para mantener toda la información específica del dispositivo
 struct usb_skel {
-    struct usb_device *udev;              // the usb device for this device
-    struct usb_interface *interface;      // the interface for this device
-    unsigned char *bulk_in_buffer;        // the buffer to receive data
-    size_t bulk_in_size;                  // the size of the receive buffer
-    __u8 bulk_in_endpointAddr;            // the address of the bulk in endpoint
-    __u8 bulk_out_endpointAddr;           // the address of the bulk out endpoint
+    struct usb_device *udev;              // El dispositivo USB para este dispositivo
+    struct usb_interface *interface;      // La interfaz para este dispositivo
+    unsigned char *bulk_in_buffer;        // El buffer para recibir datos
+    size_t bulk_in_size;                  // El tamaño del buffer de recepción
+    __u8 bulk_in_endpointAddr;            // La dirección del endpoint de entrada para recibir información del dispositivo al host.
+    __u8 bulk_out_endpointAddr;           // La dirección del endpoint de salida para enviar información del host al dispositivo.
     struct kref kref;
 };
 
 #define to_skel_dev(d) container_of(d, struct usb_skel, kref)
 
-// it is define the struct to the usb driver that we are going to use
+// Definir la estructura del driver USB que se va a usar
 static struct usb_driver driver;
 
-// delete the reference to the usb device with the kfree
+/**
+ * usb_delete - Eliminar la referencia al dispositivo USB y liberar memoria
+ * @kref: Referencia al contador del dispositivo USB
+ *
+ * Esta función decrementa el contador de referencia y libera la memoria asociada
+ * con el dispositivo USB cuando el contador llega a cero.
+ */
 static void usb_delete(struct kref *kref)
 {
     struct usb_skel *dev = to_skel_dev(kref);
@@ -49,7 +55,15 @@ static void usb_delete(struct kref *kref)
     kfree(dev);
 }
 
-// Open the device driver, when it is going to be used
+/**
+ * usb_open - Abrir el driver del dispositivo cuando va a ser usado
+ * @inode: Nodo de índice
+ * @file: Estructura de archivo
+ * 
+ * Esta función abre el dispositivo USB y lo prepara para operaciones de lectura/escritura.
+ * 
+ * Retorna 0 en caso de éxito o un código de error en caso de fallo.
+ */
 static int usb_open(struct inode *inode, struct file *file)
 {
     struct usb_skel *dev;
@@ -73,18 +87,27 @@ static int usb_open(struct inode *inode, struct file *file)
         goto exit;
     }
     
-    // increment our usage count for the device 
+    // Incrementar el contador de uso para el dispositivo
     kref_get(&dev->kref);
 
-    // save our object in the file's private structure
+    // Guardar nuestro objeto en la estructura privada del archivo
     file->private_data = dev;
 
 exit:
     return retval;
 }
 
-// As the name of the function says, this method is used to read the information that gives the driver
-// to be used in this case to warn the driver program that the instruction is ready.
+/**
+ * usb_read - Leer información del dispositivo USB
+ * @file: Estructura de archivo
+ * @buffer: Buffer del usuario para recibir datos
+ * @count: Número de bytes a leer
+ * @ppos: Posición del archivo
+ * 
+ * Esta función lee datos desde el dispositivo USB y los copia al espacio de usuario.
+ * 
+ * Retorna el número de bytes leídos o un código de error en caso de fallo.
+ */
 static ssize_t usb_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
     struct usb_skel *dev;
@@ -93,14 +116,14 @@ static ssize_t usb_read(struct file *file, char __user *buffer, size_t count, lo
 
     dev = (struct usb_skel *)file->private_data;
     
-    // do a blocking bulk read to get data from the device 
+    // Realizar una lectura bloqueante para obtener datos del dispositivo 
     retval = usb_bulk_msg(dev->udev,
                           usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr),
                           dev->bulk_in_buffer,
                           min(dev->bulk_in_size, count),
                           &actual_length, HZ*10);
 
-    // if the read was successful, copy the data to userspace 
+    // Si la lectura fue exitosa, copiar los datos al espacio de usuario.
     if (!retval) {
         if (copy_to_user(buffer, dev->bulk_in_buffer, actual_length))
             retval = -EFAULT;
@@ -111,7 +134,12 @@ static ssize_t usb_read(struct file *file, char __user *buffer, size_t count, lo
     return retval;
 }
 
-// This function is used with the write usb function 
+/**
+ * usb_write_bulk_callback - Callback para escritura masiva USB
+ * @urb: URB (USB Request Block)
+ * 
+ * Esta función es llamada cuando una operación de escritura USB se completa.
+ */ 
 static void usb_write_bulk_callback(struct urb *urb)
 {
     struct usb_skel *dev = urb->context;
@@ -126,13 +154,22 @@ static void usb_write_bulk_callback(struct urb *urb)
                 __FUNCTION__, urb->status);
     }
 
-    // free up our allocated buffer 
+    // Liberar buffer asignado
     usb_free_coherent(urb->dev, urb->transfer_buffer_length,
                       urb->transfer_buffer, urb->transfer_dma);
 }
 
-// the main function in the method is to write the data to the device, in this case we are going to send 
-// instructions that the device can understand and do something with the instructions
+/**
+ * usb_write - Escribir datos en el dispositivo USB
+ * @file: Estructura de archivo
+ * @user_buffer: Buffer del usuario con los datos a escribir
+ * @count: Número de bytes a escribir
+ * @ppos: Posición del archivo
+ * 
+ * Esta función escribe datos en el dispositivo USB enviando instrucciones.
+ * 
+ * Retorna el número de bytes escritos o un código de error en caso de fallo.
+ */
 static ssize_t usb_write(struct file *file, const char __user *user_buffer, size_t count, loff_t *ppos)
 {
     printk("Writing message in the file created by the driver!\n"); // printing that we are writing information to the device in the file
@@ -143,7 +180,7 @@ static ssize_t usb_write(struct file *file, const char __user *user_buffer, size
 
     dev = (struct usb_skel *)file->private_data;
 
-    // if there is something to write
+    // Si no hay nada que escribir
     if (count == 0)
         goto exit;
 
@@ -153,7 +190,7 @@ static ssize_t usb_write(struct file *file, const char __user *user_buffer, size
         goto error;
     }
 
-    // buffer for the data 
+    // Buffer para los datos
     buf = usb_alloc_coherent(dev->udev, count, GFP_KERNEL, &urb->transfer_dma);
     if (!buf) {
         retval = -ENOMEM;
@@ -168,14 +205,14 @@ static ssize_t usb_write(struct file *file, const char __user *user_buffer, size
                       buf, count, usb_write_bulk_callback, dev);
     urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-    // The data can be submitted to the USB core to be transmitted to the device 
+    // Los datos pueden ser enviados al núcleo USB para ser transmitidos al dispositivo
     retval = usb_submit_urb(urb, GFP_KERNEL);
     if (retval) {
         pr_err("%s - failed submitting write urb, error %d", __FUNCTION__, retval);
         goto error;
     }
 
-    // release our reference to this urb, the USB core will eventually free it entirely 
+    // Liberar nuestra referencia a este URB, el núcleo USB eventualmente lo liberará completamente
     usb_free_urb(urb);
 
 exit:
@@ -188,7 +225,7 @@ error:
     return retval;
 }
 
-// these are the operations to the file to control the driver
+// Operaciones de archivo para controlar el driver
 static struct file_operations fops = {
     .owner = THIS_MODULE,
     .read = usb_read,
@@ -196,15 +233,22 @@ static struct file_operations fops = {
     .open = usb_open,
 };
 
-// it is going to be created a file called RoboticFinger and a number, and this file is going to be used 
-// for the communication to the usb driver
+// Se va a crear un archivo llamado ArduinoDriver y un número, este archivo será usado para la comunicación con el driver USB
 static struct usb_class_driver skel_class = {
     .name = "ArduinoDriver%d",
     .fops = &fops,
     .minor_base = USB_SKEL_MINOR_BASE,
 };
 
-// this is the function called when the USB is plugged in the computer
+/**
+ * usb_probe - Función llamada cuando el USB se conecta a la computadora
+ * @interface: Interfaz del dispositivo USB
+ * @id: ID del dispositivo USB
+ * 
+ * Esta función inicializa el dispositivo USB y lo prepara para su uso.
+ * 
+ * Retorna 0 en caso de éxito o un código de error en caso de fallo.
+ */
 static int usb_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
     printk("ArduinoDriver - Hice probe al Driver \n");
@@ -215,7 +259,7 @@ static int usb_probe(struct usb_interface *interface, const struct usb_device_id
     int i;
     int retval = -ENOMEM;
 
-    // allocate memory for our device state and initialize it
+    // Asignar memoria para el estado del dispositivo e inicializarlo
     dev = kzalloc(sizeof(struct usb_skel), GFP_KERNEL);
     if (!dev) {
         pr_err("Out of memory");
@@ -258,19 +302,19 @@ static int usb_probe(struct usb_interface *interface, const struct usb_device_id
         goto error;
     }
 
-    // save our data pointer in this interface device 
+    // Guardar puntero de datos en este dispositivo de interfaz
     usb_set_intfdata(interface, dev);
 
-    // we can register the device now, as it is ready 
+    // Registrar el dispositivo ahora que está listo
     retval = usb_register_dev(interface, &skel_class);
     if (retval) {
-        // something prevented us from registering this driver 
+        // Algo nos impidió registrar este driver
         pr_err("Not able to get a minor for this device.");
         usb_set_intfdata(interface, NULL);
         goto error;
     }
 
-    // let the user know what node this device is now attached to 
+    // Informar al usuario a qué nodo está conectado este dispositivo
     dev_info(&interface->dev, "USB Skeleton device now attached to USBSkel-%d", interface->minor);
     return 0;
 
@@ -280,8 +324,12 @@ error:
     return retval;
 }
 
-// The disconnect function is called when the driver should no longer control the device for some
-// reason and can do clean-up 
+/**
+ * usb_disconnect - Función llamada cuando el driver ya no debe controlar el dispositivo
+ * @interface: Interfaz del dispositivo USB
+ * 
+ * Esta función limpia los recursos asociados con el dispositivo USB cuando se desconecta.
+ */
 static void usb_disconnect(struct usb_interface *interface)
 {
     struct usb_skel *dev;
@@ -299,22 +347,28 @@ static void usb_disconnect(struct usb_interface *interface)
     printk(KERN_INFO KBUILD_MODNAME " Me desconecté del Driver \n");
 }
 
-// This structure must be filled out by the USB driver and consists of a number of function
-// callbacks and variables that describe the USB driver to the USB core code  
+// Esta estructura debe ser completada por el driver USB 
+// Y consiste en varias funciones callback y variables que describen el driver USB al núcleo USB
 static struct usb_driver driver = {
-    .name = "ArduinoDriver", // Name of the driver
-    .id_table = tableOfDevices,       // list of all of the different kinds of USB devices this driver can accept
+    .name = "ArduinoDriver",        // Nombre del driver
+    .id_table = tableOfDevices,     // Lista de todos los diferentes tipos de dispositivos USB que este driver puede aceptar
     .probe = usb_probe,
-    .disconnect = usb_disconnect,     // This function is called by the USB core when the driver is being unloaded from the USB core.
+    .disconnect = usb_disconnect,   // This function is called by the USB core when the driver is being unloaded from the USB core.
 };
 
-// This function is in charge of registering the usb_driver
+/**
+ * usb_init - Función encargada de registrar el driver USB
+ * 
+ * Esta función registra el driver USB con el subsistema USB.
+ * 
+ * Retorna 0 en caso de éxito o un código de error en caso de fallo.
+ */
 static int __init usb_init(void)
 {
     printk(KERN_INFO KBUILD_MODNAME " Me pusieron el Driver \n");
     int result;
 
-    // register this driver with the USB subsystem 
+    // Registrar este driver con el subsistema USB
     result = usb_register(&driver);
     if (result)
         pr_err("usb_register failed. Error number %d", result);
@@ -322,14 +376,18 @@ static int __init usb_init(void)
     return result;
 }
 
-// This function is in charge of unregistering the usb_driver
+/**
+ * usb_exit - Función encargada de anular el registro del driver USB
+ * 
+ * Esta función quita el registro del driver USB del subsistema USB.
+ */
 static void __exit usb_exit(void)
 {
     printk(KERN_INFO KBUILD_MODNAME " Me quitaron el Driver \n");
     usb_deregister(&driver);
 }
 
-module_init(usb_init); // When the module is loaded, calls the function usb_init
-module_exit(usb_exit); // When the module is unloaded, calls the function usb_exit
+module_init(usb_init); // Cuando el módulo se carga, llama a la función usb_init
+module_exit(usb_exit); // Cuando el módulo se descarga, llama a la función usb_exit
 
 MODULE_LICENSE("GPL");
