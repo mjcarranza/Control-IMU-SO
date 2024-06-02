@@ -3,7 +3,10 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "/usr/bin/",
+                "/usr/local/include",
+                "/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/openmpi"
             ],
             "defines": [],
             "cStandard": "c17",
