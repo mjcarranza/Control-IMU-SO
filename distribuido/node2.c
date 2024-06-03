@@ -49,10 +49,10 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key, u
 
 int main(int argc, char** argv) {
     unsigned char ciphertext[128]; // Buffer para recibir el texto cifrado
+    unsigned char ciphertextSend[128];
     unsigned char decryptedtext[128]; // Buffer para almacenar el texto descifrado
-    int ciphertext_len;
-    MPI_Status status;
-    
+    char posiciones[20];
+
     MPI_Init(&argc, &argv); // Inicializar el entorno MPI
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Obtener el rango del proceso actual
@@ -63,37 +63,41 @@ int main(int argc, char** argv) {
 
 
     // aqui se debe enviar los datos previamente procesados a el nodo 2
-    if(rank == 0){
+    if(rank != 0){
         while (1)
         {
-            // en esta parte se tiene que recibir los datos del arduino y procesarlos para enviarlos
-            char message[] = "-1351,1068"; // Mensaje a cifrar y enviar
-            unsigned char ciphertext[20]; // Buffer para almacenar el texto cifrado
-            int ciphertext_len;
-
-            // Cifrar el mensaje
-            ciphertext_len = encrypt((unsigned char*)message, strlen(message), key, iv, ciphertext);
-
-            // Enviar el mensaje cifrado a todos los demás procesos
-            for (int i = 1; i < size; i++) {
-                MPI_Send(ciphertext, ciphertext_len, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD);
-                printf("Mensaje enviado al nodo 1");
-            }
-
-            // Recibir el mensaje cifrado del Nodo 1 con las coordenadas para los servos
+            MPI_Status status;
             MPI_Recv(ciphertext, 128, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+            int ciphertext_len;
             MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &ciphertext_len);
 
-            // Descifrar el mensaje
-            decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext);
+            decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext); // el texto decifrado se guarda en decryptedtext
 
-            // Mostrar el mensaje que llega desde el nodo 1
-            printf("El nodo %d envio el mensaje: %s\n", rank, decryptedtext);
+            // en esta parte se hace el analisis estadistico de los datos 
+            // y se calculan las posiciones de los servos
 
-            // enviar las posiciones a los servos
+            // encriptar los datos a enviar (estan en la variable posiciones)
+            ciphertext_len = encrypt((unsigned char*)posiciones, strlen(posiciones), key, iv, ciphertextSend);
+
+            // enviar de vuelta los datos al nodo 1
+            MPI_Send(&ciphertextSend, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
         }
     }
 
     MPI_Finalize(); // Finalizar el entorno MPI
     return 0; // Salir del programa
 }
+
+
+
+
+// main se encarga de 
+// recibir los datos del arduino (ver como se envian)
+// encriptar los datos 
+// enviar datos al nodo 2
+
+// recibir los datos procesados del nodo 2
+// decifrar los datos recibidos 
+// enviar las coordenadas al arduino para mover los servos
+
+// se recibe una cadena de texto como esta --->   22:42:39.695 -> GX:-1351 GY:1068
