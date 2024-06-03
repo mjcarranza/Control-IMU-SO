@@ -1,8 +1,9 @@
+
 # Nombre del ejecutable
-EXEC = node1
+EXEC = node1 node2
 
 # Archivos fuente
-SRC = node1.c
+SRC = node1.c node2.c
 
 # Compilador y banderas de compilación
 MPICC = mpicc
@@ -14,11 +15,11 @@ NP = 2
 # Regla por defecto: compilar y ejecutar
 all: $(EXEC)
 	@echo "Ejecutando con $(NP) procesos..."
-	mpirun -np $(NP) ./$(EXEC)
+	mpirun -np $(NP) $(EXEC)
 
 # Regla para compilar el ejecutable
 $(EXEC): $(SRC)
-	$(MPICC) -o $(EXEC) $(SRC) $(CFLAGS)
+	$(MPICC) -o $@ $@.c $(CFLAGS)
 
 # Regla para limpiar archivos generados
 clean:
