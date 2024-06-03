@@ -1,5 +1,8 @@
 #include <Servo.h>
+#include <Wire.h>
 
+#define MPU9250_ADDRESS 0x68
+#define GYRO_FULL_SCALE_2000_DPS 0x18
 Servo servoDer;
 Servo servoIzq;
 int currentPosDer = 0;
@@ -8,13 +11,57 @@ bool newData = false;
 char receivedChars[32]; // Array to store the received string
 int index = 0;
 
+void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* Data)
+{
+  Wire.beginTransmission(Address);
+  Wire.write(Register);
+  Wire.endTransmission();
+
+  Wire.requestFrom(Address, Nbytes);
+  uint8_t index = 0;
+  while (Wire.available())
+    Data[index++] = Wire.read();
+}
+
+// Función auxiliar de escritura
+void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
+{
+  Wire.beginTransmission(Address);
+  Wire.write(Register);
+  Wire.write(Data);
+  Wire.endTransmission();
+}
+
 void setup() {
   Serial.begin(9600);
   servoDer.attach(9); // Change the pin according to your setup for the right servo
   servoIzq.attach(10); // Change the pin according to your setup for the left servo
+  Wire.begin();
+  I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_2000_DPS);
 }
 
 void loop() {
+
+  // Lectura acelerómetro y giroscopio
+  uint8_t Buf[14];
+  I2Cread(MPU9250_ADDRESS, 0x3B, 14, Buf);
+
+  // Convertir registros giroscopio
+  int16_t gx = -(Buf[8] << 8 | Buf[9]);
+  int16_t gy = -(Buf[10] << 8 | Buf[11]);
+  int16_t gz = -(Buf[12] << 8 | Buf[13]);
+
+  // Giroscopio
+  Serial.print("GX:");
+  Serial.print(gx);
+  Serial.print(" GY:");
+  Serial.println(gy);
+  //Serial.print(" GZ:");
+  //Serial.println(gz);
+
+  delay(500);
+  //fin seccion giroscopio
+  
   if (Serial.available() > 0) {
     char receivedChar = Serial.read(); // Read the incoming byte
 
