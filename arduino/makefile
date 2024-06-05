@@ -1,4 +1,5 @@
 all:
-	gcc -o codigo-Ard codigo-Ard.c
+	gcc -o client client.c driverLib.c -lssl -lcrypto
+
 run:
-	sudo ./codigo-Ard
+	sudo ./client
