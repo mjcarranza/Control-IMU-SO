@@ -107,13 +107,13 @@ int main() {
     // variables para la comunicacion serial
     int fd;
     struct termios options;
-    char *portname = "/dev/ArduinoDriver3"; // Usar este puerto para el driver
+    char *portname = "/dev/ArduinoDriver2"; // Usar este puerto para el driver
     //const char *portname = "/dev/ttyACM1";
 
     // Abre el puerto serie
     fd = open(portname, O_RDWR);
     if (fd == -1) {
-        perror("open_port: Unable to open /dev/ArduinoDriver3 - ");
+        perror("open_port: Unable to open /dev/ArduinoDriver2 - ");
         return -1;
     }
 
