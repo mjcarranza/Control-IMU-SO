@@ -2,6 +2,7 @@
     "C_Cpp.default.compilerPath": "/usr/bin/g++-12",
     "files.associations": {
         "string.h": "c",
-        "termios.h": "c"
+        "termios.h": "c",
+        "driverlib.h": "c"
     }
 }
