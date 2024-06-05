@@ -116,8 +116,8 @@ int calculate_moving_average_and_compare(int *values, int sample_count, const ch
 int main() {
     int fd;
     struct termios options;
-    //char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
-    const char *portname = "/dev/ttyACM0";
+    char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
+    //const char *portname = "/dev/ttyACM0";
     char command[20];
     char inputIzq[5];
     char inputDer[5];
@@ -125,7 +125,7 @@ int main() {
     // Abre el puerto serie
     fd = open(portname, O_RDWR);
     if (fd == -1) {
-        perror("open_port: Unable to open /dev/ArduinoDriver3 - ");
+        perror("open_port: Unable to open /dev/ArduinoDriver2 - ");
         return -1;
     }
 
