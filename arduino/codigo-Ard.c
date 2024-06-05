@@ -82,7 +82,7 @@ int calculate_moving_average_and_compare(int *values, int sample_count, const ch
 }
 
 
-int main() {
+int main(int argc, char** argv) {
 
     // variables para la inicializacion de OpenMPI
     MPI_Status status;
@@ -107,9 +107,6 @@ int main() {
     int gx_values[MAX_SAMPLES];
     int gy_values[MAX_SAMPLES];
 
-        initialize_openssl();
-    SSL_CTX *ctx = create_context();
-    configure_context(ctx);
 
     // Crear el socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -210,7 +207,7 @@ int main() {
                     }
                     printf("Data sent to client\n");
                 }
-                cont ++;
+                contM ++;
             }
             
             
@@ -236,7 +233,7 @@ int main() {
                     MPI_Send(dy_buffer, dy_size, MPI_INT, 0, 0, MPI_COMM_WORLD);// Enviar el arreglo dy al proceso slave
                     free(dy_buffer);// Libera la memoria del buffer
                 }
-                cont ++;
+                contS ++;
             }
             
             free(gy_buffer);
