@@ -3,6 +3,9 @@
     "files.associations": {
         "string.h": "c",
         "termios.h": "c",
-        "driverlib.h": "c"
+        "driverlib.h": "c",
+        "encriptlib.h": "c",
+        "fcntl.h": "c",
+        "err.h": "c"
     }
 }

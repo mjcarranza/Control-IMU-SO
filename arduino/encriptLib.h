@@ -1,4 +1,5 @@
 #include <openssl/evp.h> // Biblioteca para cifrado OpenSSL
+#include <openssl/err.h>
 
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext);
 
