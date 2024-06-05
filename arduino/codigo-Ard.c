@@ -4,8 +4,12 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <string.h>
+#include <errno.h>
+#include <string.h>
 
-#define MAX_SAMPLES 1000
+
+#define MAX_SAMPLES 500
+#define MOVING_AVERAGE_WINDOW 10
 
 // Función para configurar la conexión serial
 int configure_serial(int fd) {
@@ -65,20 +69,55 @@ int receive_data(int fd, char *buffer, size_t length) {
     return total_read;
 }
 
+// Función para enviar datos al Arduino
+int send_data(int fd, const char *data) {
+    int length = strlen(data);
+    int total_written = 0;
+    while (total_written < length) {
+        int n_written = write(fd, data + total_written, length - total_written);
+        if (n_written < 0) {
+            printf("Error %d writing to serial: %s\n", errno, strerror(errno));
+            return -1;
+        }
+        total_written += n_written;
+    }
+    return total_written;
+}
+
 // Función para calcular la media de los valores
-void calculate_average(int *values, int sample_count, const char *label) {
+double calculate_average(int *values, int count) {
     long sum = 0;
-    for (int i = 0; i < sample_count; i++) {
+    for (int i = 0; i < count; i++) {
         sum += values[i];
     }
-    double average = sum / (double)sample_count;
-    printf("Media de %s: %f\n", label, average);
+    return sum / (double)count;
 }
+
+// Función para calcular la media móvil y comparar
+int calculate_moving_average_and_compare(int *values, int sample_count, const char *label) {
+    if (sample_count < MOVING_AVERAGE_WINDOW) {
+        printf("No hay suficientes muestras para calcular la media móvil de %s\n", label);
+        return -1;
+    }
+
+    double previous_average = calculate_average(values + sample_count - MOVING_AVERAGE_WINDOW - 1, MOVING_AVERAGE_WINDOW);
+    double current_average = calculate_average(values + sample_count - MOVING_AVERAGE_WINDOW, MOVING_AVERAGE_WINDOW);
+
+    printf("Media móvil anterior de %s: %f\n", label, previous_average);
+    printf("Media móvil actual de %s: %f\n", label, current_average);
+
+    if (abs(current_average - previous_average) > 200.0) { // Ajusta el umbral según sea necesario
+        printf("Cambio significativo en la media móvil de %s\n", label);
+        return 1;
+    }else {return 0;}
+}
+
 
 int main() {
     int fd;
     struct termios options;
-    char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
+    //char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
+    const char *portname = "/dev/ttyACM1";
     char command[20];
     char inputIzq[5];
     char inputDer[5];
@@ -99,8 +138,8 @@ int main() {
 
     // Asegúrate de que la conexión serie esté en modo bloqueante
     fcntl(fd, F_SETFL, 0);
-
-    while (1) {
+    //entrada del servo
+    /*while (1) {
         // Leer la entrada del usuario para el servo Izq
         printf("Introduce la posición para el servo Izq:\n");
         fgets(inputIzq, sizeof(inputIzq), stdin);
@@ -124,7 +163,7 @@ int main() {
         // Enviar comando al Arduino para ambos servos
         snprintf(command, sizeof(command), "%s,%s\n", inputIzq, inputDer);
         write(fd, command, strlen(command));
-    }
+    }*/
     
     int gx_values[MAX_SAMPLES];
     int gy_values[MAX_SAMPLES];
@@ -134,6 +173,9 @@ int main() {
     char read_buffer[256];
     memset(read_buffer, 0, sizeof(read_buffer));
 
+    const int arduino_interval_ms = 100;  // Intervalo de envío del Arduino en ms
+    const int usleep_interval = (arduino_interval_ms - 10) * 1000;  // Usleep en microsegundos, ajustado
+
     while (sample_count < MAX_SAMPLES) {
         int n_read = receive_data(fd, read_buffer, sizeof(read_buffer) - 1);
         if (n_read > 0) {
@@ -141,23 +183,63 @@ int main() {
             printf("Read: %s\n", read_buffer);
 
             // Extraer valores gx, gy y gz de la cadena
-            int gx, gy;
+            int gx, gy,dx,dy;
             if (sscanf(read_buffer, "GX:%d GY:%d ", &gx, &gy) == 2) {
                 gx_values[sample_count] = gx;
                 gy_values[sample_count] = gy;
+                
 
                 sample_count++;
+
+                // Calcular y comparar las medias móviles cuando hay suficientes muestras
+                if (sample_count >= MOVING_AVERAGE_WINDOW + 1) {
+                    dx=calculate_moving_average_and_compare(gx_values, sample_count, "GX");
+                    dy=calculate_moving_average_and_compare(gy_values, sample_count, "GY");
+                    printf("Media final de GX: %f\n", calculate_average(gx_values, sample_count));
+                    printf("Media final de GY: %f\n", calculate_average(gy_values, sample_count));
+
+                    printf("cambio dX: %d\n", dx);
+                    printf("cambio dY: %d\n", dy);
+
+                    char send_data_str[] = "Hello Arduino\n";
+
+
+                    /*
+                    char str1[12];  
+                    char str2[12];
+                    
+                    // Convertimos los enteros a cadenas
+                    snprintf(str1, sizeof(str1), "%d", dx);
+                    snprintf(str2, sizeof(str2), "%d", dy);
+                    
+                    // Calculamos el tamaño total necesario para la cadena resultante
+                    int totalLength = strlen("dx") +strlen(str1) + strlen("dy") + strlen(str2) + strlen(send_data_str) + 1; // +1 para el carácter nulo
+                    
+                    // Definimos el array resultante
+                    char result[totalLength];
+                    
+                    // Inicializamos la cadena resultante con la primera cadena
+                    strcpy(result, str1);
+                    
+                    // Concatenamos la segunda cadena
+                    strcat(result, str2);
+                    
+                    // Concatenamos el texto adicional
+                    strcat(result, send_data_str);*/
+
+                    if (send_data(fd, send_data_str) < 0) {
+                        close(fd);
+                        return -1;
+                    }
+                    usleep(100000);
+                }
             }
         } else if (n_read < 0) {
             printf("Error %d reading from %s: %s\n", errno, portname, strerror(errno));
             break;
         }
-        calculate_average(gx_values, sample_count, "GX");
-        calculate_average(gy_values, sample_count, "GY");
-
-        usleep(100000); // Espera un poco antes de intentar leer nuevamente
+        usleep(usleep_interval); // Espera ajustada antes de intentar leer nuevamente
     }
-
     close(fd);
     return 0;
 }

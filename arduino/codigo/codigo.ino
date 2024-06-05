@@ -38,6 +38,8 @@ void setup() {
   servoIzq.attach(10); // Change the pin according to your setup for the left servo
   Wire.begin();
   I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_2000_DPS);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 void loop() {
@@ -59,9 +61,16 @@ void loop() {
   //Serial.print(" GZ:");
   //Serial.println(gz);
 
-  delay(500);
+  delay(50);
   //fin seccion giroscopio
-  
+  if (Serial.available() > 0) {
+    // Lee el byte que llega desde la serial
+    char data = Serial.read();
+    Serial.println(data);
+    delay(1000);
+  }
+   delay(50);
+  /*
   if (Serial.available() > 0) {
     char receivedChar = Serial.read(); // Read the incoming byte
 
@@ -100,5 +109,5 @@ void loop() {
     }
 
     newData = false; // Reset flag for the next data
-  }
+  }*/
 }
