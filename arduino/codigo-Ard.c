@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <mpi.h>
+#include <openssl/evp.h> // Biblioteca para cifrado OpenSSL
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -8,6 +9,7 @@
 #include <errno.h>
 #include <string.h>
 #include "driverLib.h" // se incluye la libreria hacia el driver
+#include "encriptLib.h" // se incluye libreria para realizar la encriptacion de los datos
 
 
 #define MAX_SAMPLES 500
@@ -85,6 +87,19 @@ int calculate_moving_average_and_compare(int *values, int sample_count, const ch
 
 
 int main() {
+    unsigned char ciphertext[128]; // Buffer para recibir el texto cifrado
+    unsigned char decryptedtext[128]; // Buffer para almacenar el texto descifrado
+    int ciphertext_len;
+    MPI_Status status;
+    
+    MPI_Init(&argc, &argv); // Inicializar el entorno MPI
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Obtener el rango del proceso actual
+    MPI_Comm_size(MPI_COMM_WORLD, &size); // Obtener el tamaño del comunicador (número de procesos)
+    // Clave y IV para cifrado (esto es solo un ejemplo, en producción debes gestionarlos de manera segura)
+    unsigned char *key = (unsigned char *)"01234567890123456789012345678901"; // Clave de 256 bits
+    unsigned char *iv = (unsigned char *)"0123456789012345"; // IV de 128 bits
+
     int fd;
     struct termios options;
     //char *portname = "/dev/ArduinoDriver3"; // Set Arduino port
@@ -107,8 +122,58 @@ int main() {
     options.c_cflag |= (CLOCAL | CREAD);
     tcsetattr(fd, TCSANOW, &options);
 
-    // Asegúrate de que la conexión serie esté en modo bloqueante
+    // Asegurar que la conexión serie esté en modo bloqueante
     fcntl(fd, F_SETFL, 0);
+
+    // Ejecutar todo el proceso dentro de este while
+    while(1){
+        if(rank == 0){  // si estamos en el nodo master
+            // en esta parte se tiene que recibir los datos del arduino y procesarlos para enviarlos
+            char message[] = "-1351,1068"; // Mensaje a cifrar y enviar
+            unsigned char ciphertext[20]; // Buffer para almacenar el texto cifrado
+            int ciphertext_len;
+
+            // Cifrar el mensaje
+            ciphertext_len = encrypt((unsigned char*)message, strlen(message), key, iv, ciphertext);
+
+            // Enviar el mensaje cifrado a todos los demás procesos
+            for (int i = 1; i < size; i++) {
+                MPI_Send(ciphertext, ciphertext_len, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD);
+                printf("Mensaje enviado al nodo 1");
+            }
+
+            // Recibir el mensaje cifrado del Nodo 1 con las coordenadas para los servos
+            MPI_Recv(ciphertext, 128, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &ciphertext_len);
+
+            // Descifrar el mensaje
+            decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext);
+
+            // Mostrar el mensaje que llega desde el nodo 1
+            printf("El nodo %d envio el mensaje: %s\n", rank, decryptedtext);
+
+            // enviar las posiciones a los servos
+        }else{
+            MPI_Status status;
+            MPI_Recv(ciphertext, 128, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+            int ciphertext_len;
+            MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &ciphertext_len);
+
+            decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext); // el texto decifrado se guarda en decryptedtext
+
+            // en esta parte se hace el analisis estadistico de los datos 
+            // y se calculan las posiciones de los servos
+
+            // encriptar los datos a enviar (estan en la variable posiciones)
+            ciphertext_len = encrypt((unsigned char*)posiciones, strlen(posiciones), key, iv, ciphertextSend);
+
+            // enviar de vuelta los datos al nodo 1
+            MPI_Send(&ciphertextSend, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+            
+        }
+    }
+    
+
     //entrada del servo
     /*while (1) {
         // Leer la entrada del usuario para el servo Izq
@@ -211,6 +276,8 @@ int main() {
         }
         usleep(usleep_interval); // Espera ajustada antes de intentar leer nuevamente
     }
+
+    MPI_Finalize(); // Finalizar el entorno MPI
     close(fd);
     return 0;
 }
